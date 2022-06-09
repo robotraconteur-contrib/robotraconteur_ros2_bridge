@@ -359,8 +359,8 @@ class ROSTypeAdapterManager(object):
         rr2ros_str += "\treturn o"
         ros2rr_str += "\treturn o"
 
-        print(rr2ros_str)
-        print(ros2rr_str)
+        # print(rr2ros_str)
+        # print(ros2rr_str)
 
         exec(rr2ros_str)
         rr2ros1 = locals()["rr2ros"]
