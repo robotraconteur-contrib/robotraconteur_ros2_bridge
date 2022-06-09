@@ -2,7 +2,7 @@
 
 # Robot Raconteur ROS 2 Bridge
 
-The Robot Raconteur ROS 2 Bridge provides a Robot Raconteur service that can access arbitrary topics and services in ROS 2. The bridge dynamically generates equivalent Robot Raconteur types based on ROS 2 types. This bridge provides most of the benefits of Robot Raconteur to existing ROS 2 systems.
+The Robot Raconteur ROS 2 Bridge provides a Robot Raconteur service that can access arbitrary topics and services in ROS 2. The bridge dynamically generates equivalent Robot Raconteur types based on ROS 2 types. This bridge provides most of the benefits of Robot Raconteur to existing ROS 2 systems. Example clietns are included for Python and MATLAB.
 
 ## Installation
 
