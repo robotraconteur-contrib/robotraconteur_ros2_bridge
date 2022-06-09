@@ -18,6 +18,8 @@ sudo apt-get update
 sudo apt install python3-robotraconteur
 ```
 
+MATLAB users can install the Robot Raconteur Add-In: https://www.mathworks.com/matlabcentral/fileexchange/80509-robot-raconteur-matlab
+
 ## Invocation
 
 Before running any commands, source ROS 2 setup:
