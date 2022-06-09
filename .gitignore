@@ -358,3 +358,7 @@ generated_src
 
 vcpkg
 .cache
+
+rosmsg*.robdef
+rostopic*.robdef
+rossrv*.robdef

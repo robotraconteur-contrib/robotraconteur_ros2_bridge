@@ -14,6 +14,7 @@
 
 
 import RobotRaconteur as RR
+RRN = RR.RobotRaconteurNode.s
 import threading
 import threading
 import random
@@ -21,6 +22,9 @@ import sys
 
 import rclpy
 from rclpy.node import Node
+
+from pathlib import Path
+import importlib
 
 
 class MsgAdapter(object):
@@ -60,6 +64,18 @@ class ros2rr_class(object):
         return self.func(i, self.adapters)
 
 
+def _get_slots(rostype):
+    slots = []
+    slot_types = []
+
+    slots_and_types = rostype.get_fields_and_field_types()
+
+    for k,v in slots_and_types.items():
+        slots.append(k)
+        slot_types.append(v)
+
+    return slots, slot_types
+
 class ROSTypeAdapterManager(object):
 
     def __init__(self):
@@ -74,11 +90,9 @@ class ROSTypeAdapterManager(object):
 
             (packagename, messagename) = msgname.split('/')
 
-            rostype = __import__(packagename + '.msg',
-                                 fromlist=['']).__dict__[messagename]
+            rostype = getattr(importlib.import_module(f"{packagename}.msg"),messagename)
 
-            slots = rostype.__slots__
-            slot_types = rostype._slot_types
+            
 
             rrtype = RR.ServiceDefinition()
             rrtypename = "rosmsg_" + packagename + "__" + messagename
@@ -86,6 +100,8 @@ class ROSTypeAdapterManager(object):
             # print rrtypename
             # print rrtype
             rrtype.Name = rrtypename
+
+            slots, slot_types = _get_slots(rostype)
 
             rr2ros, ros2rr = self._generateAdapters(
                 msgname, rrtype, messagename, slot_types, slots, rostype)
@@ -103,8 +119,8 @@ class ROSTypeAdapterManager(object):
             #topic+="import ROSBridge\n"
             topic += "import " + rrtypename + "\n\n"
             topic += "object subscriber\n"
-            topic += "\tpipe " + rrtypename + "." + messagename + " subscriberpipe\n"
-            topic += "\twire " + rrtypename + "." + messagename + " subscriberwire\n"
+            topic += "\tpipe " + rrtypename + "." + messagename + " subscriberpipe [readonly]\n"
+            topic += "\twire " + rrtypename + "." + messagename + " subscriberwire [readonly]\n"
             topic += "\tfunction void unsubscribe()\n"
             topic += "end object\n"
             topic += "\n"
@@ -116,7 +132,7 @@ class ROSTypeAdapterManager(object):
             # print topic
 
             RR.RobotRaconteurNode.s.RegisterServiceType(
-                topic)  # @UndefinedVariable
+                topic) 
 
             return a
 
@@ -127,26 +143,25 @@ class ROSTypeAdapterManager(object):
 
             (packagename, servicename) = srvname.split('/')
 
-            rostype = __import__(packagename + '.srv',
-                                 fromlist=['']).__dict__[servicename]
-            rosreqtype = __import__(
-                packagename + '.srv', fromlist=['']).__dict__[servicename + "Request"]
-            rosrestype = __import__(
-                packagename + '.srv', fromlist=['']).__dict__[servicename + "Response"]
+            rostype = getattr(importlib.import_module(packagename + '.srv'),servicename)
+            rosreqtype = getattr(rostype,"Request")
+            rosrestype = getattr(rostype,"Response")
 
             rrtype = RR.ServiceDefinition()
             rrtypename = "rosservice_" + packagename + "__" + servicename
             rrtype.Name = rrtypename
 
             # Generate the request adapter
+            rosreqtype_slots, rosreqtype_slot_types = _get_slots(rosreqtype)
             rr2ros_req, ros2rr_req = self._generateAdapters(
-                srvname, rrtype, servicename+"Request", rosreqtype._slot_types, rosreqtype.__slots__, rosreqtype)
+                srvname, rrtype, servicename+"Request", rosreqtype_slot_types, rosreqtype_slots, rosreqtype)
             reqadapter = MsgAdapter(
                 srvname, rrtypename + "." + servicename+"Request", "", rr2ros_req, ros2rr_req, rosreqtype)
 
             # Generate the response adapter
+            rosrestype_slots, rosrestype_slot_types = _get_slots(rosrestype)
             rr2ros_res, ros2rr_res = self._generateAdapters(
-                srvname, rrtype, servicename+"Response", rosrestype._slot_types, rosrestype.__slots__, rosrestype)
+                srvname, rrtype, servicename+"Response", rosrestype_slot_types, rosrestype_slots, rosrestype)
             resadapter = MsgAdapter(
                 srvname, rrtypename + "." + servicename+"Response", "", rr2ros_res, ros2rr_res, rosrestype)
 
@@ -191,12 +206,12 @@ class ROSTypeAdapterManager(object):
 
         rrslots = [fixname(s) for s in slots]
 
-        __primtypes__ = ["byte", "char", "int8", "uint8", "int16", "uint16",
-                         "int32", "uint32", "int64", "uint64", "float32", "float64", "bool"]
+        __primtypes__ = ["int8", "uint8", "int16", "uint16",
+                         "int32", "uint32", "int64", "uint64", "float", "double", "boolean"]
 
         rrtype_entry = RR.ServiceEntryDefinition(rrtype)
         rrtype_entry.Name = messagename
-        rrtype_entry.IsStructure = True
+        rrtype_entry.EntryType = RR.DataTypes_structure_t
 
         rrtype.Structures.append(rrtype_entry)
 
@@ -221,29 +236,28 @@ class ROSTypeAdapterManager(object):
 
             if (slot_type in __primtypes__):
                 slot_type2 = slot_type
-                if (slot_type == 'float32'):
+                if (slot_type == 'float'):
                     slot_type2 = 'single'
-                if (slot_type == 'float64'):
-                    slot_type2 = 'double'
-                if (slot_type == 'bool'):
-                    slot_type2 = 'uint8'
-                if (slot_type == 'byte'):
-                    slot_type2 = 'int8'
+                if (slot_type == 'boolean'):
+                    slot_type2 = 'bool'
                 if (slot_type == 'char'):
                     slot_type2 = 'uint8'
 
                 t = RR.TypeDefinition()
                 t.Name = rrslots[i]
                 t.Type = RR.TypeDefinition.DataTypeFromString(slot_type2)
-                t.IsArray = isarray
-                t.Length = arrlength
-                t.VarLength = not arrfixed
+                if isarray:
+                    t.ArrayType = RR.DataTypes_ArrayTypes_array
+                    t.ArrayVarLength = not arrfixed
+                    if arrfixed:
+                        t.ArrayLength.append(arrlength)
+                        
 
                 field = RR.PropertyDefinition(rrtype_entry)
                 field.Name = rrslots[i]
                 field.Type = t
 
-                t.SetMember(field)
+                t._SetMember(field)
 
                 rrtype_entry.Members.append(field)
 
@@ -263,18 +277,14 @@ class ROSTypeAdapterManager(object):
             elif (slot_type == 'string'):
                 t = RR.TypeDefinition()
                 t.Name = rrslots[i]
-                t.Type = RR.DataTypes_string_t
-                t.IsList = isarray
-                if (isarray):
-
-                    t.Length = arrlength
-                    t.VarLength = not arrfixed
+                t.Type = RR.DataTypes_string_t                
+                t.ContainerType = RR.DataTypes_ContainerTypes_list
 
                 field = RR.PropertyDefinition(rrtype_entry)
                 field.Name = rrslots[i]
                 field.Type = t
 
-                t.SetMember(field)
+                t._SetMember(field)
 
                 rrtype_entry.Members.append(field)
 
@@ -303,19 +313,16 @@ class ROSTypeAdapterManager(object):
                     rrtype.Imports.append(rripackagename)
                 t = RR.TypeDefinition()
                 t.Name = rrslots[i]
-                t.Type = RR.DataTypes_structure_t
+                t.Type = RR.DataTypes_namedtype_t
                 t.TypeString = rripackagename + "." + imessage
-                t.IsList = isarray
-                if (isarray):
-
-                    t.Length = arrlength
-                    t.VarLength = not arrfixed
-
+                if isarray:
+                    t.ContainerType = RR.DataTypes_ContainerTypes_list
+                
                 field = RR.PropertyDefinition(rrtype_entry)
                 field.Name = rrslots[i]
                 field.Type = t
 
-                t.SetMember(field)
+                t._SetMember(field)
 
                 rrtype_entry.Members.append(field)
 
@@ -350,14 +357,15 @@ class ROSTypeAdapterManager(object):
         rr2ros_str += "\treturn o"
         ros2rr_str += "\treturn o"
 
+        # print(rr2ros_str)
+        # print(ros2rr_str)
+
         exec(rr2ros_str)
+        rr2ros1 = locals()["rr2ros"]
         exec(ros2rr_str)
+        ros2rr1 = locals()["ros2rr"]
 
-        # print rr2ros_str
-        # print ros2rr_str
-
-        # @UndefinedVariable
-        return rr2ros_class(rr2ros, rosmsgtype, adapters), ros2rr_class(ros2rr, adapters)
+        return rr2ros_class(rr2ros1, rosmsgtype, adapters), ros2rr_class(ros2rr1, adapters)
 
 
 class ROS2Bridge(object):
@@ -443,97 +451,19 @@ class subscriber(object):
         self.wires = dict()
         self.pipes = dict()
         self.rrtype = msgadapter.rrtopicname + ".subscriber"
-        self._subscriberwire = None
-        self._subscriberpipe = None
-        self._connected_wires = dict()
-        self._connected_pipes = dict()
         self._calllock = threading.RLock()
         self._ros_node = ros_node
 
         self._ros_node.create_subscription(
-            topic, msgadapter.rosmsgtype, self.callback)
+            msgadapter.rosmsgtype, topic, self.callback, 10)
 
     def callback(self, data):
         rrmsg = self.msgadapter.ros2rr(data)
 
-        with self._calllock:
-            for k in list(self._connected_wires.keys()):
-                try:
-                    w = self._connected_wires[k]
-                    w.OutValue = rrmsg
-                except:
-
-                    try:
-                        del self._connected_wires[k]
-                    except:
-                        pass
-
-                    def wclose():
-                        try:
-                            w.Close()
-                        except:
-                            pass
-                    RRN.PostToThreadPool(wclose)
-            for k in list(self._connected_pipes.keys()):
-                try:
-                    p = self._connected_pipes[k]
-                    p.SendPacket(rrmsg)
-                except:
-                    try:
-                        del self._connected_pipes[k]
-                    except:
-                        pass
-
-                    def pclose():
-                        try:
-                            p.Close()
-                        except:
-                            pass
-                    RRN.PostToThreadPool(pclose)
-
-        # print rrmsg
-
-    @property
-    def subscriberwire(self):
-        return self._subscriberwire
-
-    @subscriberwire.setter
-    def subscriberwire(self, value):
-        self._subscriberwire = value
-        value.WireConnectCallback = self._wire_connected
-
-    def _wire_connected(self, wire):
-        with self._calllock:
-            self._connected_wires[wire.Endpoint] = wire
-            wire.WireConnectionClosedCallback = self._wire_closed
-
-    def _wire_closed(self, wire):
-        with self._calllock:
-            try:
-                del self._connected_wires[wire.Endpoint]
-            except:
-                pass
-
-    @property
-    def subscriberpipe(self):
-        return self._subscriberpipe
-
-    @subscriberpipe.setter
-    def subscriberpipe(self, value):
-        self._subscriberpipe = value
-        value.PipeConnectCallback = self._pipe_connected
-
-    def _pipe_connected(self, pipe):
-        with self._calllock:
-            self._connected_pipes[(pipe.Endpoint, pipe.Index)] = pipe
-            pipe.PipeEndpointClosedCallback = self._pipe_closed
-
-    def _pipe_closed(self, pipe):
-        with self._calllock:
-            try:
-                del self._connected_pipes[(pipe.Endpoint, pipe.Index)]
-            except:
-                pass
+        try:
+            self.subscriberwire.OutValue = rrmsg
+            self.subscriberpipe.SendPacket(rrmsg)
+        except AttributeError: pass
 
     def unsubscribe(self):
         pass
@@ -549,7 +479,7 @@ class publisher(object):
         self._ros_node = ros_node
 
         self.pub = self._ros_node.create_publisher(
-            topic, msgadapter.rosmsgtype)
+            msgadapter.rosmsgtype, topic, 10)
 
     def publish(self, rrmsg):
         with self._calllock:
@@ -599,7 +529,9 @@ class service(object):
 
 def main():
 
-    RR.RobotRaconteurNode.s.RegisterServiceTypeFromFile("experimental.ros2_bridge")
+    script_dir = Path(__file__).parent
+
+    RR.RobotRaconteurNode.s.RegisterServiceTypeFromFile(str(script_dir / "experimental.ros2_bridge"))
 
     if (len(sys.argv) > 1):
         if (sys.argv[1] == 'msg'):
@@ -632,15 +564,17 @@ def main():
         return
 
     rclpy.init(args=sys.argv)
-    ros_node = rclpy.Node("robotraconteur_ros2_bridge")
+    ros_node = Node("robotraconteur_ros2_bridge")
     o = ROS2Bridge(ros_node)
 
     with RR.ServerNodeSetup("ros2_bridge", 34572):
 
-        RRN.RobotRaconteurNode.s.RegisterService(
+        RRN.RegisterService(
             "ros2_bridge", "experimental.ros2_bridge.ROS2Bridge", o)  # @UndefinedVariable
 
-        input('Press enter to quit')
+        print('Press ctrl-c to quit')
+
+        rclpy.spin(ros_node)
 
 
 if __name__ == '__main__':

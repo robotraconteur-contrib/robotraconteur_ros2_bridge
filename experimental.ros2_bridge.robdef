@@ -1,15 +1,13 @@
 service experimental.ros2_bridge
 
-
 object ROS2Bridge
-    function int32 subscribe (string topic, string msgtype)
+    function int32 subscribe(string topic, string msgtype)
     objref varobject{int32} subscribers
-    function int32 publish (string topic, string msgtype)
+    function int32 publish(string topic, string msgtype)
     objref varobject{int32} publishers
-    function int32 client (string service, string srvtype)
+    function int32 client(string service, string srvtype)
     objref varobject{int32} clients
-    function int32 register_service (string service, string srvtype)
+    function int32 register_service(string service, string srvtype)
     objref varobject{int32} services
-end object
-
+end
 
