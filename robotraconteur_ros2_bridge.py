@@ -51,8 +51,8 @@ class rr2ros_class(object):
         self.func = func
         self.adapters = adapters
 
-    def __call__(self, i):
-        return self.func(i, self.rostype, self.adapters)
+    def __call__(self, i, o=None):
+        return self.func(i, self.rostype, self.adapters, o)
 
 
 class ros2rr_class(object):
@@ -216,7 +216,7 @@ class ROSTypeAdapterManager(object):
 
         rrtype.Structures.append(rrtype_entry)
 
-        rr2ros_str = "def rr2ros(i, rostype, adapters):\n\to=rostype()\n"
+        rr2ros_str = "def rr2ros(i, rostype, adapters, o=None):\n\tif o is None:\t\to=rostype()\n"
         ros2rr_str = "def ros2rr(i, adapters):\n\to=RR.RobotRaconteurNode.s.NewStructure('" + \
             rrtype.Name + "." + messagename + "')\n"
 
@@ -359,8 +359,8 @@ class ROSTypeAdapterManager(object):
         rr2ros_str += "\treturn o"
         ros2rr_str += "\treturn o"
 
-        # print(rr2ros_str)
-        # print(ros2rr_str)
+        print(rr2ros_str)
+        print(ros2rr_str)
 
         exec(rr2ros_str)
         rr2ros1 = locals()["rr2ros"]
@@ -522,16 +522,15 @@ class service(object):
         self._ros_node = ros_node
 
         self.rosproxy = self._ros_node.create_service(
-            service, srvadapter.rossrvtype, self.call)
+            srvadapter.rossrvtype, service, self.call)
         self.endpoint = RR.ServerEndpoint.GetCurrentEndpoint()
 
-    def call(self, req):
+    def call(self, req, res):
         with self._calllock:
             rrreq = self.srvadapter.reqadapter.ros2rr(req)
             rrres = self.servicefunction.GetClientFunction(
                 self.endpoint)(rrreq)
-            return self.srvadapter.resadapter.rr2ros(rrres)
-
+            return self.srvadapter.resadapter.rr2ros(rrres,res)
 
 def main():
 
