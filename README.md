@@ -48,6 +48,64 @@ Run the turtlesim:
 ros2 run turtlesim turtlesim_node
 ```
 
+## Usage
+
+The bridge provides the following functions:
+
+* **subscribe**: Subscribe to a ROS 2 topic and receive the incoming messages using a `wire` or `pipe` member
+* **publish**: Publish to a ROS 2 topic using a function member
+* **client**: ROS 2 service client
+* **service**: ROS 2 service
+
+For all cases, first connect to the service:
+
+```python
+from RobotRaconteur.Client import *
+c = RRN.ConnectService("rr+tcp://localhost:34572?service=ros2_bridge")
+```
+
+Replace `localhost` with the IP address of the server computer if using a network. Robot Raconteur Discovery and Subscriptions can also be used to automatically determine the URL.
+
+### Subscribe
+
+Subscriptions use the "subscribe" function, followed by the "subscriptions" objref to access the subscription. The "subscribe" function has the following signature:
+
+```
+function int32 subscribe(string topic, string msgtype)
+```
+
+`msgtype` is the ROS 2 message type and must be specified. The returned object from the objref has a wire and pipe that can be used to read the data. See `examples/turtlesim_subscriber.py` and `examples/turtlesim_subscriber_matlab.m` for examples on subscribers.
+
+### Publisher
+
+Publishers use the "publish" function, followed by the "publishers" objref to access subscriptions. The "publish" function has the following signature:
+
+```
+function int32 publish(string topic, string msgtype)
+```
+
+`msgtype` is the ROS 2 message type and must be specified. The returned object from the objref has a `publish` function that can be used to publish messages. See `examples/turtlesim_publisher.py` and `examples/turtlesim_publisher_matlab.m` for examples on publishers.
+
+### Service Client
+
+Service clients use the "client" function, followed by the "clients" objref to access subscriptions. The "client" function has the following signature:
+
+```
+function int32 client(string service, string srvtype)
+```
+
+`srvtype` is the ROS 2 service type and must be specified. The returned object from the objref has a `call` function that can be used to call the service. See `examples/turtlesim_service_client.py` and `examples/turtlesim_service_client_matlab.m` for examples on service clients.
+
+### Services
+
+Services use the "register_service" function, followed by the "services" objref to access subscriptions. The "services" function has the following signature:
+
+```
+function int32 register_service(string service, string srvtype)
+```
+
+`srvtype` is the ROS 2 service type and must be specified. The returned object from the objref has a `servicefunction` callback that will be called from ROS. This callback must have a function handle set by the client, and the client must remain connected for the subscription to be called. See `examples/example_service.py` and `examples/example_service_matlab.m` for examples on service clients.
+
 ## robdef pre-generation
 
 The bridge dynamically generates equivalent Robot Raconteur robdef definitions for ROS 2 message and service types. For pregenerated languages like C++, or for reference, it is sometimes necessary to generate these files explicitly. This can be done from the command line with the `msg` and `srv` arguments.
@@ -138,61 +196,3 @@ object ROS2Bridge
     objref varobject{int32} services
 end
 ```
-
-## Normal Usage
-
-The bridge provides the following functions:
-
-* **subscribe**: Subscribe to a ROS 2 topic and receive the incoming messages using a `wire` or `pipe` member
-* **publish**: Publish to a ROS 2 topic using a function member
-* **client**: ROS 2 service client
-* **service**: ROS 2 service
-
-For all cases, first connect to the service:
-
-```python
-from RobotRaconteur.Client import *
-c = RRN.ConnectService("rr+tcp://localhost:34572?service=ros2_bridge")
-```
-
-Replace `localhost` with the IP address of the server computer if using a network. Robot Raconteur Discovery and Subscriptions can also be used to automatically determine the URL.
-
-### Subscribe
-
-Subscriptions use the "subscribe" function, followed by the "subscriptions" objref to access the subscription. The "subscribe" function has the following signature:
-
-```
-function int32 subscribe(string topic, string msgtype)
-```
-
-`msgtype` is the ROS 2 message type and must be specified. The returned object from the objref has a wire and pipe that can be used to read the data. See `examples/turtlesim_subscriber.py` and `examples/turtlesim_subscriber_matlab.m` for examples on subscribers.
-
-### Publisher
-
-Publishers use the "publish" function, followed by the "publishers" objref to access subscriptions. The "publish" function has the following signature:
-
-```
-function int32 publish(string topic, string msgtype)
-```
-
-`msgtype` is the ROS 2 message type and must be specified. The returned object from the objref has a `publish` function that can be used to publish messages. See `examples/turtlesim_publisher.py` and `examples/turtlesim_publisher_matlab.m` for examples on publishers.
-
-### Service Client
-
-Service clients use the "client" function, followed by the "clients" objref to access subscriptions. The "client" function has the following signature:
-
-```
-function int32 client(string service, string srvtype)
-```
-
-`srvtype` is the ROS 2 service type and must be specified. The returned object from the objref has a `call` function that can be used to call the service. See `examples/turtlesim_service_client.py` and `examples/turtlesim_service_client_matlab.m` for examples on service clients.
-
-### Services
-
-Services use the "register_service" function, followed by the "services" objref to access subscriptions. The "services" function has the following signature:
-
-```
-function int32 register_service(string service, string srvtype)
-```
-
-`srvtype` is the ROS 2 service type and must be specified. The returned object from the objref has a `servicefunction` callback that will be called from ROS. This callback must have a function handle set by the client, and the client must remain connected for the subscription to be called. See `examples/example_service.py` and `examples/example_service_matlab.m` for examples on service clients.
