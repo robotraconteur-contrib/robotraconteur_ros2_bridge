@@ -361,4 +361,4 @@ vcpkg
 
 rosmsg*.robdef
 rostopic*.robdef
-rossrv*.robdef
+rosservice*.robdef

@@ -122,12 +122,12 @@ class ROSTypeAdapterManager(object):
             topic += "\tpipe " + rrtypename + "." + messagename + " subscriberpipe [readonly]\n"
             topic += "\twire " + rrtypename + "." + messagename + " subscriberwire [readonly]\n"
             topic += "\tfunction void unsubscribe()\n"
-            topic += "end object\n"
+            topic += "end\n"
             topic += "\n"
             topic += "object publisher\n"
             topic += "\tfunction void publish(" + \
                 rrtypename + "." + messagename + " m)\n"
-            topic += "end object\n"
+            topic += "end\n"
 
             # print topic
 
@@ -172,7 +172,8 @@ class ROSTypeAdapterManager(object):
             clientstr = "object rosclient\n"
             clientstr += "function " + servicename + \
                 "Response call(" + servicename + "Request request)\n"
-            clientstr += "end object\n"
+            clientstr += "function bool wait_for_service(double timeout)\n"
+            clientstr += "end\n"
             clientobj = RR.ServiceEntryDefinition(rrtype)
             clientobj.FromString(clientstr)
 
@@ -180,7 +181,7 @@ class ROSTypeAdapterManager(object):
             servicestr += "callback " + servicename + \
                 "Response servicefunction(" + \
                 servicename + "Request request)\n"
-            servicestr += "end object\n"
+            servicestr += "end\n"
             serviceobj = RR.ServiceEntryDefinition(rrtype)
             serviceobj.FromString(servicestr)
 
@@ -277,8 +278,9 @@ class ROSTypeAdapterManager(object):
             elif (slot_type == 'string'):
                 t = RR.TypeDefinition()
                 t.Name = rrslots[i]
-                t.Type = RR.DataTypes_string_t                
-                t.ContainerType = RR.DataTypes_ContainerTypes_list
+                t.Type = RR.DataTypes_string_t
+                if isarray:         
+                    t.ContainerType = RR.DataTypes_ContainerTypes_list
 
                 field = RR.PropertyDefinition(rrtype_entry)
                 field.Name = rrslots[i]
@@ -497,13 +499,17 @@ class client(object):
         self._ros_node = ros_node
 
         self.rosproxy = self._ros_node.create_client(
-            service, srvadapter.rossrvtype)
+            srvadapter.rossrvtype, service)
 
     def call(self, rrreq):
         with self._calllock:
             req = self.srvadapter.reqadapter.rr2ros(rrreq)
-            res = self.rosproxy(req)
+            res = self.rosproxy.call(req)
             return self.srvadapter.resadapter.ros2rr(res)
+
+    def wait_for_service(self, timeout):
+        return self.rosproxy.wait_for_service(timeout)
+            
 
 
 class service(object):
