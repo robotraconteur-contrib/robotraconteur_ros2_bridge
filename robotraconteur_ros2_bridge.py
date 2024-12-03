@@ -25,6 +25,7 @@ from rclpy.node import Node
 
 from pathlib import Path
 import importlib
+import re
 
 
 class MsgAdapter(object):
@@ -233,6 +234,11 @@ class ROSTypeAdapterManager(object):
                 if (len(a) != 0):
                     arrfixed = True
                     arrlength = int(a)
+            else:
+                seq_m = re.match(r'^sequence<(.*)>$', slot_type)
+                if seq_m:
+                    slot_type = seq_m.group(1)
+                    isarray = True
 
             if (slot_type in __primtypes__):
                 slot_type2 = slot_type
@@ -251,6 +257,8 @@ class ROSTypeAdapterManager(object):
                     t.ArrayVarLength = not arrfixed
                     if arrfixed:
                         t.ArrayLength.append(arrlength)
+                    else:
+                        t.ArrayLength.append(0)
                         
 
                 field = RR.PropertyDefinition(rrtype_entry)
@@ -268,13 +276,9 @@ class ROSTypeAdapterManager(object):
                     def f2(in_,out,adapters,slot=slots[i],rrslot=rrslots[i]): 
                         if (len(getattr(in_,slot)!=arrlength)): raise Exception('Invalid length')
                     ros2rr_f.append(f2)
-                if (not ((slot_type == 'int8' or slot_type == 'uint8') and isarray)):
-                    rr2ros_f.append(lambda in_,out,adapters,slot=slots[i],rrslot=rrslots[i]: setattr(out,slot,getattr(in_,rrslot)))
-                    ros2rr_f.append(lambda in_,out,adapters,slot=slots[i],rrslot=rrslots[i]: setattr(out,rrslot,getattr(in_,slot)))
-                else:
-                    rr2ros_f.append(lambda in_,out,adapters,slot=slots[i],rrslot=rrslots[i]: setattr(out,slot,getattr(in_,rrslot)))
-                    ros2rr_f.append(lambda in_,out,adapters,slot=slots[i],rrslot=rrslots[i]: setattr(out,rrslot,bytearray(getattr(in_,slot))))
-
+                
+                rr2ros_f.append(lambda in_,out,adapters,slot=slots[i],rrslot=rrslots[i]: setattr(out,slot,getattr(in_,rrslot)))
+                ros2rr_f.append(lambda in_,out,adapters,slot=slots[i],rrslot=rrslots[i]: setattr(out,rrslot,getattr(in_,slot)))
             elif (slot_type == 'string'):
                 t = RR.TypeDefinition()
                 t.Name = rrslots[i]
@@ -338,11 +342,11 @@ class ROSTypeAdapterManager(object):
                             raise Exception('Invalid length')
                     ros2rr_f.append(f2)
                 if (not isarray):
-                    rr2ros_f.append(lambda in_,out,adapters,slot=slots[i],rrslot=rrslots[i]: setattr(out,slot,adapters[slot_type].rr2ros(getattr(in_,rrslot))))
-                    ros2rr_f.append(lambda in_,out,adapters,slot=slots[i],rrslot=rrslots[i]: setattr(out,rrslot,adapters[slot_type].ros2rr(getattr(in_,slot))))
+                    rr2ros_f.append(lambda in_,out,adapters,slot=slots[i],rrslot=rrslots[i],slot_type=slot_type: setattr(out,slot,adapters[slot_type].rr2ros(getattr(in_,rrslot))))
+                    ros2rr_f.append(lambda in_,out,adapters,slot=slots[i],rrslot=rrslots[i],slot_type=slot_type: setattr(out,rrslot,adapters[slot_type].ros2rr(getattr(in_,slot))))
                 else:
-                    rr2ros_f.append(lambda in_,out,adapters,slot=slots[i],rrslot=rrslots[i]: setattr(out,slot,[adapters[slot_type].rr2ros(d) for d in (getattr(in_,rrslot))]))
-                    ros2rr_f.append(lambda in_,out,adapters,slot=slots[i],rrslot=rrslots[i]: setattr(out,rrslot,[adapters[slot_type].ros2rr(d) for d in (getattr(in_,slot))]))
+                    rr2ros_f.append(lambda in_,out,adapters,slot=slots[i],rrslot=rrslots[i],slot_type=slot_type: setattr(out,slot,[adapters[slot_type].rr2ros(d) for d in (getattr(in_,rrslot))]))
+                    ros2rr_f.append(lambda in_,out,adapters,slot=slots[i],rrslot=rrslots[i],slot_type=slot_type: setattr(out,rrslot,[adapters[slot_type].ros2rr(d) for d in (getattr(in_,slot))]))
 
             else:
                 if (hasattr(rostype, "_type")):
